@@ -1,0 +1,15 @@
+Package: plateReadeR
+Title: Read, Format, and Quality Control Plate Reader Output
+Version: 0.0.0.9000
+Authors@R: 
+    person("Shane L", "Hogle", , "shane.hogle@abo.fi", role = c("aut", "cre"))
+Description: Read text and Excel output files from different microplate
+    readers, convert them to tidy data frames, and run basic quality
+    control checks.
+License: GPL (>= 3)
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 8.1.1
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
