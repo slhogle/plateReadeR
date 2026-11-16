@@ -1,3 +1,24 @@
-# plateReadeR (development version)
+# plateReadeR 0.0.0.9000
 
-* Initial CRAN submission.
+## Readers
+
+* `read_bioscreen()` reads Bioscreen C text exports (UTF-16, comma decimals) for one or two 100-well plates. Wells are named by a zero-padded `well` within `plate_id`, and the position in the run is kept as `well_index`. Compressed files are read directly.
+* `read_logphase_txt()` reads LogPhase600 text exports, one plate per file.
+* `read_logphase_xlsx()` reads the `Raw Data` sheets of a LogPhase600 Excel export, one plate per sheet.
+* All readers return a tidy tibble with `seconds`, `hours`, `plate_id`, `well` and `od`. Times are made relative to the first read and snapped to a regular grid.
+* `snap_hours()` snaps elapsed hours onto the nominal read interval so timepoints line up across plates and runs.
+
+## Quality control
+
+* `flag_od_range()` adds well-level flags for saturated and negative OD.
+* `blank_correct()` subtracts a blank, either named blank wells (time-matched, same plate, averaged if several) or the mean of each well's first reads, and clips at zero. It can also add a smoothed copy with `smooth = TRUE`.
+* `smooth_od()` applies a centered rolling mean (5 points by default). Smoothing is off by default.
+* `flag_no_growth()` flags wells whose blank-corrected OD never rises.
+
+## Plotting
+
+* `plot_plate()` draws growth curves for one plate, one panel per well, coloured by QC status, with an option to overlay the smoothed curve on the raw curve.
+
+## Documentation
+
+* A vignette, `vignette("plateReadeR")`, walks through the workflow on a LogPhase600 plate and a Bioscreen run.

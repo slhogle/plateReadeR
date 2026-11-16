@@ -9,7 +9,23 @@ Description: Read text and Excel output files from different microplate
 License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 8.1.1
 Suggests: 
+    hms,
+    knitr,
+    rmarkdown,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
+Imports: 
+    ggplot2,
+    lubridate,
+    readr,
+    readxl,
+    rlang,
+    slider,
+    stats,
+    tibble,
+    tools,
+    utils
+Config/roxygen2/version: 8.1.1
+URL: https://slhogle.github.io/plateReadeR/
+VignetteBuilder: knitr
