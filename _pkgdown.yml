@@ -1,4 +1,25 @@
 url: https://slhogle.github.io/plateReadeR/
 template:
   bootstrap: 5
+  math-rendering: mathjax
 
+reference:
+  - title: Read plate reader output
+    desc: Read instrument files into tidy data frames.
+    contents:
+      - read_bioscreen
+      - read_logphase_txt
+      - read_logphase_xlsx
+      - read_synergy_xlsx
+      - read_synergy_endpoint
+      - snap_hours
+  - title: Quality control
+    desc: Flag problem wells, blank-correct and smooth growth curves.
+    contents:
+      - flag_od_range
+      - blank_correct
+      - smooth_od
+      - flag_no_growth
+  - title: Plotting
+    contents:
+      - plot_plate
