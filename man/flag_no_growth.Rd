@@ -17,7 +17,8 @@ well to count as growing.}
 \item{od}{Name of the blank-corrected OD column.}
 }
 \value{
-\code{data} with added well-level logical column \code{flag_no_growth}.
+\code{data} with added well-level logical column \code{flag_no_growth}. It is
+\code{NA} for wells with no readings (for example unused wells).
 }
 \description{
 A well is flagged when its blank-corrected OD never climbs more than

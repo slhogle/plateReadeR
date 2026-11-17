@@ -1,6 +1,7 @@
 url: https://slhogle.github.io/plateReadeR/
 template:
   bootstrap: 5
+  math-rendering: mathjax
 
 reference:
   - title: Read plate reader output
@@ -9,6 +10,8 @@ reference:
       - read_bioscreen
       - read_logphase_txt
       - read_logphase_xlsx
+      - read_synergy_xlsx
+      - read_synergy_endpoint
       - snap_hours
   - title: Quality control
     desc: Flag problem wells, blank-correct and smooth growth curves.

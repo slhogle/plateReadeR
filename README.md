@@ -1,14 +1,18 @@
 # plateReadeR
 
-`plateReadeR` reads text and Excel output files from different microplate readers, converts them to tidy data frames, and runs basic quality control checks. Joining the data to sample metadata is left to the user.
+`plateReadeR` reads  output files (plain text, csv, Microsoft Excel) from different microplate readers with a target audience of scientists who are using these to analyze microbial growth curves. Currently I have implemented parsers for the [Bioscreen C MBR](https://www.bioscreen.fi/about/), [Agilent BioTek LogPhase 600](https://www.agilent.com/en/video/logphase600) and the [BioTek Synergy H1 Multimode Reader](https://www.agilent.com/en/product/microplate-instrumentation/microplate-readers/multimode-microplate-readers/biotek-synergy-h1-multimode-reader-1623193).
+
+These parsers convert files from these instruments into tidy data frames, and runs basic quality control checks with sensible defaults. The user can then join the plate tidied results to sample metadata for downstream analysis.
 
 | Function | Instrument | Format |
 |----|----|----|
 | `read_logphase_txt()` | LogPhase600 | text, one file per plate |
-| `read_logphase_xlsx()` | LogPhase600 | Excel, `Raw Data` sheets, one per plate |
-| `read_bioscreen()` | Bioscreen C | UTF-16 text, one or two 100-well plates |
+| `read_logphase_xlsx()` | LogPhase600 | Excel; `sheet = "raw"`, `"results"` or `"procedure"`, all plates stacked |
+| `read_synergy_xlsx()` | Synergy H1 | Excel time course; `sheet = "raw"`, `"results"` or `"setup"` |
+| `read_synergy_endpoint()` | Synergy H1 | Excel single time point |
+| `read_bioscreen()` | Bioscreen C | UTF-16 text or csv, one or two 100-well plates |
 
-All readers return one row per well per time point, with `plate_id` and `well` identifying the well.
+The time course readers return one row per well per time point, with `plate_id` and `well` identifying the well.
 
 ## Installation
 

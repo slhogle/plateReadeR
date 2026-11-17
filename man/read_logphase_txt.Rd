@@ -4,7 +4,12 @@
 \alias{read_logphase_txt}
 \title{Read LogPhase600 text export}
 \usage{
-read_logphase_txt(path, interval_hours = 1/3, encoding = "latin1")
+read_logphase_txt(
+  path,
+  interval_hours = 1/3,
+  thin_hours = NULL,
+  encoding = "latin1"
+)
 }
 \arguments{
 \item{path}{Path to the text file.}
@@ -12,6 +17,12 @@ read_logphase_txt(path, interval_hours = 1/3, encoding = "latin1")
 \item{interval_hours}{Nominal read interval in hours, passed to
 \code{\link[=snap_hours]{snap_hours()}}. Default is 20 minutes (\code{1/3}). Use \code{NULL} to keep the
 reported times.}
+
+\item{thin_hours}{Optional coarser read interval in hours, for example \code{1}
+to keep one read per hour. Thinning happens after times are snapped to the
+\code{interval_hours} grid, keeps only reads that fall on the coarser grid, and
+requires \code{interval_hours} to be set and \code{thin_hours} to be a whole
+multiple of it. \code{NULL} (default) keeps every read.}
 
 \item{encoding}{File encoding. Defaults to \code{"latin1"}, which these exports
 use (the header contains a degree sign).}

@@ -8,7 +8,12 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 8, fig.height = 6)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 8,
+  fig.height = 6
+)
 ```
 
 plateReadeR reads output files from plate readers into a tidy table and offers a few basic quality control (QC) steps. This vignette walks through the whole workflow on a LogPhase600 plate: read, flag, blank-correct, smooth and plot. Joining the data to sample metadata is left to you.
@@ -19,13 +24,15 @@ library(plateReadeR)
 
 ## Read
 
-Each reader returns one row per well per time point. Time is made relative to the first read and snapped to a regular grid with `snap_hours()`, so that plates from different runs line up exactly.
+Each reader returns one row per well per time point. Time is in elapsed seconds/hours. These are snapped to a regular grid with `snap_hours()`, so that plates from different runs are harmonized and can later be joined or aligned. This is necessary because there is sometimes some drift that prevents joining by elapsed time.
 
 | Function | Instrument | Format |
 |---|---|---|
 | `read_logphase_txt()` | LogPhase600 | text, one file per plate |
-| `read_logphase_xlsx()` | LogPhase600 | Excel, `Raw Data` sheets, one per plate |
-| `read_bioscreen()` | Bioscreen C | UTF-16 text, one or two 100-well plates |
+| `read_logphase_xlsx()` | LogPhase600 | Excel; `sheet = "raw"`, `"results"` or `"procedure"`, all plates combined. Returns one tibble for all plates |
+| `read_synergy_xlsx()` | Synergy H1 | Excel time course; `sheet = "raw"`, `"results"` or `"setup"` |
+| `read_synergy_endpoint()` | Synergy H1 | Excel single time point |
+| `read_bioscreen()` | Bioscreen C | UTF-16 text or csv, one or two 100-well plates |
 
 ```{r read}
 f <- system.file("extdata", "logphase600_plate1.txt", package = "plateReadeR")
@@ -33,11 +40,29 @@ d <- read_logphase_txt(f)
 d
 ```
 
-A well is identified by `plate_id` and `well`, in all three readers. `plate_id` is only unique within a run, so add your own run identifier before combining runs, for example with `rbind()`.
+Excel exports hold several different sheets for each plate. The most useful one is the "Raw Data" sheet but sometimes the "Summary" sheet is useful to determine how the Logphase600 calculated different growth parameters (e.g., lagtime and growth rate). The "Procedure" sheet describes the different technical specifications of the run. The funcitons `read_logphase_xlsx()` and `read_synergy_xlsx()` can read each of these sheet types using the paramter `sheet`. The procedure sheet is parsed into one row per plate:
+
+```{r sheets}
+xf <- system.file(
+  "extdata",
+  "logphase600_example.xlsx",
+  package = "plateReadeR"
+)
+read_logphase_xlsx(xf, sheet = "procedure")[c(
+  "plate_id",
+  "runtime_hours",
+  "interval_hours",
+  "shaking_rpm",
+  "wavelength_nm",
+  "temperature_setpoint_c"
+)]
+```
+
+Wells are only identified using `plate_id` and `well`, in every reader. You will need to join these to your own metadata file to make them unique across runs.
 
 ## Flag saturated and negative OD
 
-`flag_od_range()` adds well-level flags, so every row of a flagged well carries the flag. There is no default saturation threshold because it depends on your instrument and plate; the value below is only an example.
+`flag_od_range()` adds well-level flags for wells that have either negative OD values or values that exceed a threshold value. This `saturation` value needs to be selected by the user. There is no default.
 
 ```{r flag-range}
 d <- flag_od_range(d, saturation = 2)
@@ -46,23 +71,23 @@ table(unique(d[c("well", "flag_saturated", "flag_negative")])[-1])
 
 ## Blank-correct
 
-`blank_correct()` subtracts a blank and clips the result at zero. With no `blank` supplied, each well is corrected by the mean of its own first 5 reads.
+If you plate has blank wells (it should!) `blank_correct()` can subtract blank wells from all other wells, with an OD floor at 0. With no `blank` supplied, it is assumed that the first 5 reads in a well are not measuring growth so these are averaged as a "pseudo-blank" and then subtracted.
 
 ```{r blank}
 d <- blank_correct(d)
 d[d$well == "A09", c("hours", "od", "blank_od", "od_corrected")][1:5, ]
 ```
 
-Alternatively, name blank wells. They are matched by time point within the same plate, and several blank wells on a plate are averaged. (Not run here, because which wells are blanks depends on your plate layout.)
+Alternatively, you can name the blank wells. They are matched by time  within the same plate. If multiple blanks are supplied they are averaged. (Not run here, because which wells are blanks depends on your plate layout.)
 
 ```{r blank-wells, eval = FALSE}
 blanks <- data.frame(plate_id = "Plate 1", well = c("A01", "B01"))
 blank_correct(d, blank = blanks)
 ```
 
-## Flag wells that never rise
+## Flag wells with no growth
 
-`flag_no_growth()` flags wells whose corrected OD never climbs more than `min_rise` above its starting level. The default of 0.05 is a starting point: check it against wells you know do and do not grow.
+`flag_no_growth()` flags wells whose corrected OD never increases past the `min_rise` OD threshold. The default of 0.05 is a starting point: check it against wells you know do and do not grow.
 
 ```{r no-growth}
 d <- flag_no_growth(d, min_rise = 0.05)
@@ -71,7 +96,7 @@ table(unique(d[c("well", "flag_no_growth")])$flag_no_growth)
 
 ## Smooth
 
-Smoothing is off by default. `smooth_od()` applies a 5-point centered rolling mean to each well. It adds `od_corrected_rollmean`, leaving the raw and corrected columns unchanged. (`blank_correct(smooth = TRUE)` does the same in one step.)
+Smoothing is off by default. `smooth_od()` applies a 5-point centered rolling mean to each well. It adds `od_corrected_rollmean`, leaving the raw and corrected columns intact. (`blank_correct(smooth = TRUE)` does the same in one step.)
 
 ```{r smooth}
 d <- smooth_od(d)
@@ -80,22 +105,16 @@ names(d)
 
 ## Plot
 
-`plot_plate()` draws one panel per well for one plate, coloured by QC status. A well with no flags is `"ok"`, and a well with several flags shows them joined with `+`. With `smooth = TRUE` the smoothed curve is overlaid on the raw one.
+`plot_plate()` draws one panel per well for one plate. Curve color shows QC status. A well with no flags is `"ok"`, and a well with several flags shows them joined with `+`. With `smooth = TRUE` the smoothed curve is overlaid on the raw one.
 
 ```{r plot, fig.height = 7}
 plot_plate(d, plate = "Plate 1", smooth = TRUE)
 ```
 
-Because the QC columns are ordinary columns, you can use them to drop wells before further analysis.
-
-```{r filter}
-keep <- d[!d$flag_no_growth & !d$flag_saturated & !d$flag_negative, ]
-length(unique(keep$well))
-```
 
 ## A Bioscreen run
 
-`read_bioscreen()` handles the Bioscreen C text export, which is UTF-16 with comma decimals; both are detected and converted for you. A run holds one or two 100-well plates, with wells 1 to 100 on plate 1 and 101 to 200 on plate 2. Wells are named by a zero-padded `well` within each `plate_id` (`"001"` to `"100"`), so the key is the same `plate_id` and `well` pair as for the LogPhase600. The position in the run (1 to 200) is kept as `well_index`. The `Blank` column the instrument writes, which is always zero, is dropped by default.
+`read_bioscreen()` handles the Bioscreen C text export, which is UTF-16 with comma decimals; both are detected and converted automatically. A Bioscreen C run holds one or two 100-well plates, with wells 1 to 100 on plate 1 and 101 to 200 on plate 2. Wells are named by a zero-padded `well` within each `plate_id` (`"001"` to `"100"`), so the key is the same `plate_id` and `well` pair as for the LogPhase600. The position in the run (1 to 200) is kept as `well_index`. The `Blank` column the instrument writes is always zero (don't understand what this is for). This is dropped by default.
 
 The file below is a complete two-plate run, 567 reads at about 5-minute intervals over 47 hours, stored xz-compressed (readers can read compressed files directly).
 
@@ -105,7 +124,7 @@ b <- read_bioscreen(bf)
 b
 ```
 
-The same QC steps apply. Here the smoothed curve is added during blank correction with `smooth = TRUE`.
+The same QC steps from the logphase600 apply to the bioscreen. Here the smoothed curve is added during blank correction with `smooth = TRUE`.
 
 ```{r bioscreen-qc}
 b <- b |>
@@ -113,13 +132,23 @@ b <- b |>
   blank_correct(smooth = TRUE) |>
   flag_no_growth()
 
-unique(b[c("plate_id", "well", "flag_saturated", "flag_negative", "flag_no_growth")]) |>
+unique(b[c(
+  "plate_id",
+  "well",
+  "flag_saturated",
+  "flag_negative",
+  "flag_no_growth"
+)]) |>
   subset(select = -well) |>
-  aggregate(cbind(flag_saturated, flag_negative, flag_no_growth) ~ plate_id, data = _, FUN = sum)
+  aggregate(
+    cbind(flag_saturated, flag_negative, flag_no_growth) ~ plate_id,
+    data = _,
+    FUN = sum
+  )
 ```
 
 Wells on a Bioscreen plate are laid out as a square grid of numbers rather than lettered rows, so `plot_plate()` draws them as a 10 by 10 grid.
 
-```{r bioscreen-plot, fig.height = 7}
+```{r bioscreen-plot, fig.height = 9}
 plot_plate(b, plate = "Plate 2", smooth = TRUE)
 ```

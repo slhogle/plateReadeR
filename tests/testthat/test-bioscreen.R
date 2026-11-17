@@ -100,3 +100,68 @@ test_that("the bundled full run has two plates and 567 reads", {
   expect_equal(length(unique(d$seconds)), 567)
   expect_equal(nrow(d), 567 * 200)
 })
+
+test_that("thin_hours thins after snapping", {
+  full <- read_bioscreen(example_file())
+  thin <- read_bioscreen(example_file(), thin_hours = 1 / 3)
+  expect_equal(unique(thin$seconds %% 1200), 0)
+  expect_equal(
+    sort(unique(thin$seconds)),
+    sort(unique(full$seconds[full$seconds %% 1200 == 0]))
+  )
+  expect_equal(nrow(thin), 200 * length(unique(thin$seconds)))
+  expect_equal(
+    thin$od,
+    full$od[full$seconds %% 1200 == 0]
+  )
+  expect_equal(read_bioscreen(example_file(), thin_hours = 1 / 12), full)
+  expect_error(
+    read_bioscreen(example_file(), thin_hours = 0.1),
+    "whole multiple"
+  )
+  expect_error(
+    read_bioscreen(example_file(), interval_hours = NULL, thin_hours = 1),
+    "interval_hours"
+  )
+})
+
+test_that("unexpected well counts warn", {
+  expect_warning(
+    read_bioscreen(example_file(), wells_per_plate = 40),
+    "Found 200 wells"
+  )
+  expect_no_warning(read_bioscreen(example_file()))
+})
+
+test_that("csv exports are read like text exports", {
+  f <- system.file("extdata", "bioscreen_example.csv", package = "plateReadeR")
+  d <- read_bioscreen(f)
+  expect_named(d, c("seconds", "hours", "plate_id", "well", "well_index", "od"))
+  expect_equal(length(unique(d$well_index)), 200)
+  expect_equal(sort(unique(d$plate_id)), c("Plate 1", "Plate 2"))
+  expect_false(anyNA(d$od))
+  expect_true(all(d$od > 0 & d$od < 5))
+  # comma decimals inside quoted csv fields: 0,124 is 0.124
+  expect_equal(d$od[d$well_index == 1][1], 0.124)
+})
+
+test_that("a header-only file is an error", {
+  tmp <- tempfile(fileext = ".csv")
+  writeLines(c("Label,\"\"", "Info,\"\"", "Time,Blank,1,2"), tmp)
+  expect_error(read_bioscreen(tmp, encoding = "UTF-8"), "no data rows")
+})
+
+test_that("a partly filled second plate does not warn", {
+  tmp <- tempfile(fileext = ".txt")
+  writeLines(
+    c(
+      "Label",
+      "Info",
+      paste("Time Blank", paste(1:140, collapse = " ")),
+      paste("00:00:00 0,000", paste(rep("0,100", 140), collapse = " "))
+    ),
+    tmp
+  )
+  expect_no_warning(d <- read_bioscreen(tmp, encoding = "UTF-8"))
+  expect_equal(sum(d$plate_id == "Plate 2"), 40)
+})

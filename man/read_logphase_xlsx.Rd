@@ -4,35 +4,63 @@
 \alias{read_logphase_xlsx}
 \title{Read LogPhase600 Excel export}
 \usage{
-read_logphase_xlsx(path, sheet = NULL, skip = 0, interval_hours = 1/3)
+read_logphase_xlsx(
+  path,
+  sheet = c("raw", "results", "procedure"),
+  interval_hours = 1/3,
+  thin_hours = NULL
+)
 }
 \arguments{
 \item{path}{Path to the xlsx file.}
 
-\item{sheet}{Sheet names or numbers to read. If \code{NULL} (default), every
-sheet with \verb{Raw Data} in its name.}
+\item{sheet}{Which kind of sheet to read: \code{"raw"} (default), \code{"results"} or
+\code{"procedure"}.}
 
-\item{skip}{Rows to skip before the header row on each sheet.}
-
-\item{interval_hours}{Nominal read interval in hours, passed to
-\code{\link[=snap_hours]{snap_hours()}}. Default is 20 minutes (\code{1/3}). Use \code{NULL} to keep the
-reported times.}
+\item{interval_hours, thin_hours}{Used only when \code{sheet = "raw"}. See
+\code{\link[=read_logphase_txt]{read_logphase_txt()}}.}
 }
 \value{
-A tibble with columns \code{seconds}, \code{hours}, \code{well}, \code{od} and
-\code{plate_id} (the sheet name without the \verb{- Raw Data} suffix, such as
-\code{"Plate 1"}).
+A tibble. The columns depend on \code{sheet}; all have \code{plate_id}, the
+sheet name without the trailing sheet type (such as \code{"Plate 1"}).
+\itemize{
+\item \code{"raw"}: \code{seconds}, \code{hours}, \code{well}, \code{od} and \code{plate_id}.
+\item \code{"results"}: one row per well with \code{plate_id}, \code{well} (zero-padded as
+for \code{"raw"}), \code{lag_hours}, \code{max_rate} (OD per minute) and
+\code{stationary_hours}. Join to the raw data by \code{plate_id} and \code{well}.
+\item \code{"procedure"}: one row per plate with \code{plate_id}, \code{plate_comment},
+\code{plate_type}, \code{runtime_hours}, \code{interval_hours}, \code{max_reads},
+\code{wavelength_nm}, \code{incubator}, \code{temperature_setpoint_c},
+\code{temperature_gradient}, \code{shaking}, \code{shaking_rpm} and \code{summary}.
+}
 }
 \description{
-Reads the raw data sheets from an Excel export of a LogPhase600 plate
-reader. A run can hold up to four 96-well plates. Each plate has its own
-\code{Results}, \verb{Raw Data} and \code{Procedure} sheets (for example \verb{Plate 1 - Raw Data}). Only the \verb{Raw Data} sheets are read, one per plate; these are
-equivalent to the text files.
+Reads one kind of sheet from an Excel export of a LogPhase600 plate reader.
+A run can hold up to four 96-well plates, and each plate has its own
+\code{Results}, \verb{Raw Data} and \code{Procedure} sheets (for example \verb{Plate 1 - Raw Data}). The \code{sheet} argument chooses which kind to read; every plate in the
+file is read and the plates are stacked into one table, identified by
+\code{plate_id}. To keep only some plates, filter on \code{plate_id} afterwards.
 }
 \details{
+\itemize{
+\item \code{"raw"}: the optical density time courses, equivalent to the text files.
 Processing is the same as for \code{\link[=read_logphase_txt]{read_logphase_txt()}}.
+\item \code{"results"}: the per-well summary the instrument software computed (lag
+time, maximum growth rate and stationary phase). These are rarely needed,
+since the package works from the raw reads, but they are available for
+comparison with your own estimates. The instrument stores lag time and
+stationary phase as Excel day fractions, which are converted to hours.
+Wells for which the software reported no value (\verb{?????} in the sheet) are
+\code{NA}.
+\item \code{"procedure"}: the run settings recorded for each plate, parsed from the
+procedure summary text into one row per plate. Times are converted to
+hours and on/off settings to logicals. The original text is kept in
+\code{summary}, in case a setting is not covered by the parsed columns.
+}
 }
 \examples{
 f <- system.file("extdata", "logphase600_example.xlsx", package = "plateReadeR")
 read_logphase_xlsx(f)
+read_logphase_xlsx(f, sheet = "results")
+read_logphase_xlsx(f, sheet = "procedure")
 }

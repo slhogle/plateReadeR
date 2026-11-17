@@ -212,7 +212,8 @@ smooth_od <- function(data, od = NULL, window = 5) {
 #' @param n_reads Number of initial reads averaged to get the starting level.
 #' @param od Name of the blank-corrected OD column.
 #'
-#' @return `data` with added well-level logical column `flag_no_growth`.
+#' @return `data` with added well-level logical column `flag_no_growth`. It is
+#'   `NA` for wells with no readings (for example unused wells).
 #' @export
 #' @examples
 #' f <- system.file("extdata", "bioscreen_example.txt", package = "plateReadeR")
@@ -237,6 +238,9 @@ flag_no_growth <- function(
     data[[od]],
     g,
     function(v) {
+      if (all(is.na(v))) {
+        return(NA_real_)
+      }
       max(v, na.rm = TRUE) - mean(utils::head(v, n_reads), na.rm = TRUE)
     },
     seconds = data$seconds

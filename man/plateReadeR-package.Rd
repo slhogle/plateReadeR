@@ -8,6 +8,13 @@
 \description{
 Read text and Excel output files from different microplate readers, convert them to tidy data frames, and run basic quality control checks.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://slhogle.github.io/plateReadeR/}
+}
+
+}
 \author{
 \strong{Maintainer}: Shane L Hogle \email{shane.hogle@abo.fi}
 

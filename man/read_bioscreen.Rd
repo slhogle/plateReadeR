@@ -9,12 +9,13 @@ read_bioscreen(
   decimal_mark = ",",
   encoding = NULL,
   interval_hours = 1/12,
+  thin_hours = NULL,
   wells_per_plate = 100,
   keep_blank = FALSE
 )
 }
 \arguments{
-\item{path}{Path to the Bioscreen text file. Compressed files (\code{.gz}, \code{.xz},
+\item{path}{Path to the Bioscreen text or csv file. Compressed files (\code{.gz}, \code{.xz},
 \code{.bz2}, \code{.zip}) are read directly.}
 
 \item{decimal_mark}{Decimal mark used in the file, \code{","} or \code{"."}.}
@@ -26,6 +27,12 @@ byte-order mark, falling back to \code{"UTF-16LE"}, which Bioscreen exports use.
 minutes). Elapsed times are snapped to multiples of this with
 \code{\link[=snap_hours]{snap_hours()}} so that timepoints match exactly across plates and runs.
 Use \code{NULL} to keep the reported times.}
+
+\item{thin_hours}{Optional coarser read interval in hours, for example \code{1/3}
+to keep one read every 20 minutes. Thinning happens after times are
+snapped to the \code{interval_hours} grid, keeps only reads that fall on the
+coarser grid, and requires \code{interval_hours} to be set and \code{thin_hours} to
+be a whole multiple of it. \code{NULL} (default) keeps every read.}
 
 \item{wells_per_plate}{Number of wells in each Bioscreen plate (100 for the
 Honeycomb plates).}
@@ -42,13 +49,15 @@ or \code{"Plate 2"}, the same format as the LogPhase600 readers), \code{well}
 density).
 }
 \description{
-Reads a plain text export from a Bioscreen C plate reader and returns a
+Reads a text or csv export from a Bioscreen C plate reader and returns a
 tidy (long) table with one row per well per time point.
 }
 \details{
-Bioscreen exports are UTF-16LE text files with two preamble lines (\code{Label}
-and \code{Info}), a header line (\code{Time}, \code{Blank}, then well numbers) and
-space-separated rows of readings. The instrument computer often uses a comma
+Bioscreen exports are UTF-16LE files with two preamble lines (\code{Label} and
+\code{Info}), a header line (\code{Time}, \code{Blank}, then well numbers) and one row of
+readings per time point. Text exports separate fields with spaces; csv
+exports separate them with commas and quote each value. The format is
+detected from the header line, so both are read by the same call. The instrument computer often uses a comma
 as the decimal mark, which is why \code{decimal_mark} defaults to \code{","}.
 
 A Bioscreen run holds either one or two 100-well plates, so files contain

@@ -1,11 +1,13 @@
 #' Read Bioscreen C output
 #'
-#' Reads a plain text export from a Bioscreen C plate reader and returns a
+#' Reads a text or csv export from a Bioscreen C plate reader and returns a
 #' tidy (long) table with one row per well per time point.
 #'
-#' Bioscreen exports are UTF-16LE text files with two preamble lines (`Label`
-#' and `Info`), a header line (`Time`, `Blank`, then well numbers) and
-#' space-separated rows of readings. The instrument computer often uses a comma
+#' Bioscreen exports are UTF-16LE files with two preamble lines (`Label` and
+#' `Info`), a header line (`Time`, `Blank`, then well numbers) and one row of
+#' readings per time point. Text exports separate fields with spaces; csv
+#' exports separate them with commas and quote each value. The format is
+#' detected from the header line, so both are read by the same call. The instrument computer often uses a comma
 #' as the decimal mark, which is why `decimal_mark` defaults to `","`.
 #'
 #' A Bioscreen run holds either one or two 100-well plates, so files contain
@@ -19,7 +21,7 @@
 #' times are therefore snapped onto a regular grid with [snap_hours()]; see
 #' `interval_hours`.
 #'
-#' @param path Path to the Bioscreen text file. Compressed files (`.gz`, `.xz`,
+#' @param path Path to the Bioscreen text or csv file. Compressed files (`.gz`, `.xz`,
 #'   `.bz2`, `.zip`) are read directly.
 #' @param decimal_mark Decimal mark used in the file, `","` or `"."`.
 #' @param encoding File encoding. If `NULL` (default) it is detected from the
@@ -28,6 +30,11 @@
 #'   minutes). Elapsed times are snapped to multiples of this with
 #'   [snap_hours()] so that timepoints match exactly across plates and runs.
 #'   Use `NULL` to keep the reported times.
+#' @param thin_hours Optional coarser read interval in hours, for example `1/3`
+#'   to keep one read every 20 minutes. Thinning happens after times are
+#'   snapped to the `interval_hours` grid, keeps only reads that fall on the
+#'   coarser grid, and requires `interval_hours` to be set and `thin_hours` to
+#'   be a whole multiple of it. `NULL` (default) keeps every read.
 #' @param wells_per_plate Number of wells in each Bioscreen plate (100 for the
 #'   Honeycomb plates).
 #' @param keep_blank If `TRUE`, keep the `Blank` column as well `"Blank"` (with
@@ -48,6 +55,7 @@ read_bioscreen <- function(
   decimal_mark = ",",
   encoding = NULL,
   interval_hours = 1 / 12,
+  thin_hours = NULL,
   wells_per_plate = 100,
   keep_blank = FALSE
 ) {
@@ -68,21 +76,9 @@ read_bioscreen <- function(
     rlang::abort("Could not find a header line starting with 'Time'.")
   }
 
-  header <- strsplit(lines[header_idx], "\\s+")[[1]]
-  rows <- strsplit(lines[-seq_len(header_idx)], "\\s+")
-  rows <- rows[lengths(rows) > 0]
-  if (!all(lengths(rows) == length(header))) {
-    rlang::abort(
-      "Data rows do not all have the same number of fields as the header."
-    )
-  }
-
-  mat <- matrix(
-    unlist(rows, use.names = FALSE),
-    nrow = length(rows),
-    byrow = TRUE
-  )
-  colnames(mat) <- header
+  parsed <- bioscreen_split_rows(lines[header_idx:length(lines)])
+  header <- parsed$header
+  mat <- parsed$mat
 
   seconds <- bioscreen_time_to_seconds(mat[, "Time"])
   if (!is.null(interval_hours)) {
@@ -102,6 +98,19 @@ read_bioscreen <- function(
   if (anyNA(well_index)) {
     rlang::abort(
       "Well columns must be named by number (and optionally 'Blank')."
+    )
+  }
+
+  n_wells <- sum(well_index > 0L)
+  if (n_wells > 2L * wells_per_plate) {
+    rlang::warn(
+      paste0(
+        "Found ",
+        n_wells,
+        " wells; at most ",
+        2L * wells_per_plate,
+        " (two plates) are expected. Check `wells_per_plate`."
+      )
     )
   }
 
@@ -126,7 +135,48 @@ read_bioscreen <- function(
     well_index = index_long,
     od = vals
   )
+  out <- thin_reads(out, thin_hours, interval_hours)
   out[order(out$well_index, out$seconds), ]
+}
+
+# Split the header and data lines of a Bioscreen export into a character
+# matrix. Text exports are whitespace separated; csv exports are comma
+# separated with quoted values. Blank rows (all fields empty) are dropped.
+bioscreen_split_rows <- function(lines) {
+  if (grepl(",", lines[1], fixed = TRUE)) {
+    df <- readr::read_csv(
+      I(lines),
+      col_types = readr::cols(.default = readr::col_character()),
+      name_repair = "minimal",
+      progress = FALSE
+    )
+    header <- names(df)
+    keep <- header %in% c("Time", "Blank") | grepl("^[0-9]+$", header)
+    mat <- as.matrix(df[, keep, drop = FALSE])
+    header <- header[keep]
+    colnames(mat) <- header
+    mat[is.na(mat)] <- ""
+    mat <- mat[rowSums(mat != "") > 0, , drop = FALSE]
+  } else {
+    header <- strsplit(lines[1], "\\s+")[[1]]
+    rows <- strsplit(lines[-1], "\\s+")
+    rows <- rows[lengths(rows) > 0]
+    if (!all(lengths(rows) == length(header))) {
+      rlang::abort(
+        "Data rows do not all have the same number of fields as the header."
+      )
+    }
+    mat <- matrix(
+      unlist(rows, use.names = FALSE),
+      nrow = length(rows),
+      byrow = TRUE
+    )
+    colnames(mat) <- header
+  }
+  if (nrow(mat) == 0) {
+    rlang::abort("The file has a header but no data rows.")
+  }
+  list(header = header, mat = mat)
 }
 
 # Convert "HH:MM:SS" (hours may exceed 24) to seconds

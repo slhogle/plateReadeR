@@ -7,6 +7,8 @@ export(plot_plate)
 export(read_bioscreen)
 export(read_logphase_txt)
 export(read_logphase_xlsx)
+export(read_synergy_endpoint)
+export(read_synergy_xlsx)
 export(smooth_od)
 export(snap_hours)
 importFrom(rlang,
